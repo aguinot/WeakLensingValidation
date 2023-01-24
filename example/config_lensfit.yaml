@@ -26,7 +26,7 @@ galaxy_catalog:
   # path: ['galaxy_catalog_1.fits', 'galaxy_catalo_2.fits']
   path:
     type: eval
-    func: "[f'galaxy_catalog_{i}.fits' for i in $patch$]"
+    func: "[f'/Users/aguinot/Documents/weaklensingvalidation_test/test_cat/small_lensfit_cat_{i}.fits.hdf5' for i in $patch$]"
   # If keep_cat_history == True we keep track of the objects and from which
   # catalog they come from. A variable is define internaly var_cat_history
   # that can be used to make plot per catalog (see ploting below).
@@ -40,21 +40,29 @@ galaxy_catalog:
 
   # Define columns and and link name in the catalog to internal naming
   columns:
-    ra: ra
-    dec: dec
+    ra: ALPHA_J2000
+    dec: DELTA_J2000
     e1: e1
     e2: e2
-    weights: w
+    weights: weight
     e1_psf:
       type: eval
       # Variable are first checked among internal variable (define in config
-      # file) and then among the catalog columns
-      func: "($PSF_Q11$ - $PSF_Q22$) / ($PSF_Q11$ + $PSF_Q22$ + 2. * sqrt($PSF_Q11$ * $PSF_Q22$ - $PSF_Q12$**2))"
-    e2_psf: e2_psf
-    size_psf: fwhm_psf
-    mag: mag
+      # file) and then among the catalog columns.
+      # Basic math functions can be used if they are implemented in dask.
+      # To call them use "da.<math_function>". For example "da.sqrt". Almost
+      # all functions that are available in numpy also exist in dask.
+      func: "($PSF_Q11$ - $PSF_Q22$) / ($PSF_Q11$ + $PSF_Q22$ + 2. * da.sqrt($PSF_Q11$ * $PSF_Q22$ - $PSF_Q12$**2))"
+    e2_psf:
+      type: eval
+      func: "(2.*$PSF_Q12$) / ($PSF_Q11$ + $PSF_Q22$ + 2. * da.sqrt($PSF_Q11$ * $PSF_Q22$ - $PSF_Q12$**2))"
+    size_psf:
+      type: eval
+      func: ($PSF_Q11$*$PSF_Q22$ - 2.*$PSF_Q12$)**0.25 * 2.355 * 0.187
+    mag: MAG_AUTO
 
 star_catalog:
+  # path: 'star_catalog_1.fits'
   path:
     type: eval
     func: "[f'star_catalog_{i}.fits' for i in $patch$]"
