@@ -415,7 +415,7 @@ class ConfigParser():
 
         # Get the path
         if isinstance(cat_dict['path'], str):
-            path_output['path'] = cat_dict['path']
+            path_output['path'] = [cat_dict['path']]
         elif isinstance(cat_dict['path'], list):
             path_output['path'] = cat_dict['path']
         elif isinstance(cat_dict['path'], dict):
