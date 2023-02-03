@@ -3,6 +3,9 @@
 # Some of the ideas are inspired by the Galsim parser
 
 import yaml
+
+import numpy as np
+
 import copy
 import re
 import os
@@ -24,13 +27,22 @@ _classic_star_columns = [
     'dec',
     'x',
     'y',
-    'n_ccd',
+    'ccd_nb',
     'e1_psf',
     'e2_psf',
     'size_psf',
     'e1_star',
     'e2_star',
     'size_star',
+]
+
+_psf_residuals_columns = [
+    'focal_plane_display',
+    'npix_x',
+    'npix_y',
+    'nbin_x',
+    'nbin_y',
+    'plot',
 ]
 
 
@@ -95,6 +107,9 @@ class ConfigParser():
         # Star catalogue
         if 'star_catalog' in config_raw.keys():
             self._parse_star_catalog(config_raw)
+
+        if 'psf_residuals' in config_raw.keys():
+            self._parse_psf_residuals(config_raw)
 
     def _parse_workspace(self, config_raw):
         """parse workspace
@@ -304,6 +319,152 @@ class ConfigParser():
                         'var': var
                     }
         config = {'star_catalog': config}
+        self.config.update(config)
+
+    def _parse_psf_residuals(self, config_raw):
+
+        config = {}
+        psf_res_dict = config_raw['psf_residuals']
+
+        if not all(
+            [
+                needed_key in psf_res_dict.keys()
+                for needed_key in _psf_residuals_columns
+            ]
+        ):
+            raise ValueError(
+                "The psf_residuals neeeds to have at least those entries: "
+                f"{_catalog_fields}"
+                )
+
+        # First we parse the focal_plane_display
+        if not isinstance(psf_res_dict['focal_plane_display'], str):
+            raise ValueError("focal_plane_display has to be a string")
+
+        fov_disp = psf_res_dict["focal_plane_display"]
+
+        # First we split the lines
+        cam_lines = re.split(r'\n', fov_disp)
+
+        # Now we split the CCDs
+        all_ccds = []
+        n_ccd_per_line = 0
+        n_ccd = 0
+        for cam_line in cam_lines:
+            line_ccds_raw = re.split(r'\s+', cam_line)
+            line_ccds = []
+            for ccd in line_ccds_raw:
+                try:
+                    line_ccds.append(int(ccd))
+                except ValueError:
+                    if ccd == 'NA':
+                        line_ccds.append(999)
+                    else:
+                        continue
+            if len(line_ccds) == 0:
+                continue
+            n_ccd_line_tmp = len(line_ccds)
+            if n_ccd_per_line == 0:
+                n_ccd_per_line = n_ccd_line_tmp
+            elif n_ccd_line_tmp != n_ccd_per_line:
+                raise ValueError(
+                    "All the lines must have the same number of CCD. "
+                    "If it is not the case fill with NA as a place order"
+                )
+            n_ccd += len([ccd for ccd in line_ccds if ccd != 999])
+            all_ccds.append(line_ccds)
+        print("n_ccd found:", n_ccd)
+        config['focal_plane_display'] = np.array(all_ccds)
+        config['n_ccd'] = n_ccd
+
+        # We check the eval function
+        if 'eval_func' in psf_res_dict.keys():
+            eval_func = self._parse_eval(
+                psf_res_dict['eval_func'],
+                'eval_func'
+            )
+        else:
+            # default to np.nanmean
+            eval_func = np.nanmean
+
+        # Now we check the requested plots
+        if len(psf_res_dict['plot'].keys()) == 0:
+            raise ValueError("No plot found in psf_residuals")
+
+        star_cat_columns = self.config['star_catalog']['columns'].keys()
+        plot_dict = {}
+        for plot_name in psf_res_dict['plot'].keys():
+            plot_tmp = psf_res_dict['plot'][plot_name]
+
+            # Get plot name
+            if 'name' not in plot_tmp.keys():
+                raise ValueError(f"'name' not found for: {plot_name}")
+            plot_dict[plot_name] = {'name': plot_tmp['name']}
+
+            # Get plot function
+            if 'plot' not in plot_tmp.keys():
+                raise ValueError(f"'plot' not found for: {plot_name}")
+            if isinstance(plot_tmp['plot'], str):
+                if plot_tmp['plot'] not in star_cat_columns:
+                    raise ValueError(
+                        f"Only the column among {star_cat_columns} "
+                        f"can be used. Got: {plot_tmp['plot']}"
+                    )
+                plot_dict[plot_name]['plot'] = plot_tmp['plot']
+            elif isinstance(plot_tmp['plot'], dict):
+                func, var_names = self._parse_eval(plot_tmp['plot'], 'plot')
+                if not all(
+                    [
+                        var_name in star_cat_columns
+                        for var_name in var_names
+                    ]
+                ):
+                    raise ValueError(
+                        f"Only the column among {star_cat_columns} "
+                        f"can be used. Got: {var_names}"
+                    )
+                plot_dict[plot_name]['plot'] = {
+                    'func': func,
+                    'var': var_names
+                }
+            else:
+                raise ValueError(f"Unreconized plot type for {plot_name}")
+
+            # Get eval_func, if not given set to global or default
+            if 'eval_func' in plot_tmp.keys():
+                plot_dict[plot_name]['eval_func'] = self._parse_eval(
+                    plot_tmp['eval_func'],
+                    plot_name,
+                )
+            else:
+                plot_dict[plot_name]['eval_func'] = eval_func
+
+        config['plot'] = plot_dict
+
+        # Finally we set the other ploting parameters
+        try:
+            nbin_x = int(psf_res_dict['nbin_x'])
+        except Exception:
+            raise ValueError("In psf_residuals, nbin_x must be an integer.")
+        try:
+            nbin_y = int(psf_res_dict['nbin_y'])
+        except Exception:
+            raise ValueError("In psf_residuals, nbin_y must be an integer.")
+        config['nbin_x'] = nbin_x
+        config['nbin_y'] = nbin_y
+
+        try:
+            npix_x = int(psf_res_dict['npix_x'])
+        except Exception:
+            raise ValueError("In psf_residuals, npix_x must be an integer.")
+        try:
+            npix_y = int(psf_res_dict['npix_y'])
+        except Exception:
+            raise ValueError("In psf_residuals, npix_y must be an integer.")
+        config['npix_x'] = npix_x
+        config['npix_y'] = npix_y
+
+        config = {'psf_residuals': config}
         self.config.update(config)
 
     def _read_yaml_file(self, path):
