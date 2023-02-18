@@ -1,0 +1,193 @@
+# Config file for lensfit analysis
+
+####################
+# Global variables #
+####################
+var-1:
+  name: patch
+  # Can handle int, float, str, list
+  # More complex variable would raise errors. The below example could be
+  # achieve by doing:
+  value: 'list(range(1, 3))'
+  # Just calling range will raise an error.
+  # value: '[1, 2]'
+
+
+###################
+# Workspace setup #
+###################
+# Name of the run
+run_name: lensfit
+
+# The directory used for the run and store the results
+workspace_directory: /Users/aguinot/Documents/weaklensingvalidation_test/workspace
+
+# If True, the processing is skiped and only the plot are done.
+# For this option to work run as to be done with the same workspace_directory
+# and run_name
+# plot_only: True
+
+
+############
+# Catalogs #
+############
+galaxy_catalog:
+  # If more than one catalog is provided they all need to have the same format
+  path: '/Users/aguinot/Documents/weaklensingvalidation_test/test_cat/small_lensfit_cat_1.fits.hdf5'
+  # path: ['galaxy_catalog_1.fits', 'galaxy_catalo_2.fits']
+  # path:
+  #   type: eval
+  #   func: "[f'/Users/aguinot/Documents/weaklensingvalidation_test/test_cat/small_lensfit_cat_{i}.fits.hdf5' for i in $patch$]"
+  # If keep_cat_history == True we keep track of the objects and from which
+  # catalog they come from. A variable is define internaly var_cat_history
+  # that can be used to make plot per catalog (see ploting below).
+  # var_cat_history can also be set manually.
+  # This feature only work if more than one catalog is provided.
+  keep_cat_history: True
+  var_cat_history: patch
+
+  # Type of catalog
+  type: classic
+
+  # Define columns and and link name in the catalog to internal naming
+  columns:
+    ra: ALPHA_J2000
+    dec: DELTA_J2000
+    e1: e1
+    e2: e2
+    weights: weight
+    e1_psf:
+      type: eval
+      # Variable are first checked among internal variable (define in config
+      # file) and then among the catalog columns.
+      # Basic math functions can be used if they are implemented in dask.
+      # To call them use "da.<math_function>". For example "da.sqrt". Almost
+      # all functions that are available in numpy also exist in dask.
+      func: "($PSF_Q11$ - $PSF_Q22$) / ($PSF_Q11$ + $PSF_Q22$ + 2. * da.sqrt($PSF_Q11$ * $PSF_Q22$ - $PSF_Q12$**2))"
+    e2_psf:
+      type: eval
+      func: "(2.*$PSF_Q12$) / ($PSF_Q11$ + $PSF_Q22$ + 2. * da.sqrt($PSF_Q11$ * $PSF_Q22$ - $PSF_Q12$**2))"
+    size_psf:
+      type: eval
+      func: ($PSF_Q11$*$PSF_Q22$ - 2.*$PSF_Q12$)**0.25 * 2.355 * 0.187
+    mag: MAG_AUTO
+
+star_catalog:
+  path: '/Users/aguinot/Documents/weaklensingvalidation_test/test_cat/P1psf_model.fits'
+  # path:
+  #   type: eval
+  #   func: "[f'/Users/aguinot/Documents/weaklensingvalidation_test/test_cat/P{i}psf_model_small.fits' for i in $patch$]"
+  # This part is ignored for the star catalog if a galaxy catalog is provided.
+  # Everything set here will be updated based on the galaxy catalog.
+  # keep_cat_history: True
+  # var_cat_history: patch
+
+  # Type of catalog
+  type: classic
+
+  columns:
+    ra: ALPHA_J2000_1
+    dec: DELTA_J2000_1
+    x: xpos_chip
+    y: ypos_chip
+    ccd_nb: chipID
+    e1_star: psfe_data0
+    e2_star: psfe_data1
+    size_star:
+      type: eval
+      func: ($moments_data0$ * $moments_data1$ - 2.*$moments_data2$)**0.25 * 2.355 * 0.187
+    cen_x_star: centroid_data0
+    cen_y_star: centroid_data1
+    e1_psf: psfe_model0
+    e2_psf: psfe_model1
+    size_psf:
+      type: eval
+      func: ($moments_model0$ * $moments_model1$ - 2.*$moments_model2$)**0.25 * 2.355 * 0.187
+    cen_x_psf: centroid_model0
+    cen_y_psf: centroid_model1
+
+
+#########
+# Plots #
+#########
+psf_residuals:
+  # Right now we can only display rectangular focal planes
+  # If the geomtry is more complex, like for MegaCam (in this example), one
+  # can use "NA" to not display a CCD at this position.
+  # The CCDs ID should match the one in the star catalog.
+  # If a CCD is upside down, one can use "-" in front of the ID to invert the
+  # CCD on on the plot.
+  focal_plane_display: "
+    NA 32 33 34 35 36 37 38 39 40 NA\n
+    21 22 23 24 25 26 27 28 29 30 31\n
+    10 11 12 13 14 15 16 17 18 19 20\n
+    NA 01 02 03 04 05 06 07 08 09 NA\n
+    "
+
+  # CCD size along x and y
+  npix_x: 2048
+  npix_y: 4612
+
+  # n bins used along x and y
+  nbin_x: 20
+  nbin_y: 40
+
+  # Function to use to evaluate each bins
+  # See the plot n_star for a more complex example
+  # If not provided, default to: np.nanmean
+  eval_func:
+    type: eval
+    func: np.nanmedian
+
+  plot:
+    model_e1:
+      name: '$e_{1, \mathrm{model}}$'
+      plot: e1_psf
+    model_e2:
+      name: '$e2_{\mathrm{model}}$'
+      plot: e2_psf
+    model_size:
+      name: "FWHM model"
+      plot: size_psf
+    star_e1:
+      name: '$e1_{\mathrm{star}}$'
+      plot: e1_star
+    star_e2:
+      name: '$e2_{\mathrm{star}}$'
+      plot: e2_star
+    res_e1:
+      name: '$e1_{\mathrm{model}} - e1_{\mathrm{star}}$'
+      plot:
+        type: eval
+        func: "$e1_psf$ - $e1_star$"
+    res_e2:
+      name: '$e2_{\mathrm{model}} - e2_{\mathrm{star}}$'
+      plot:
+        type: eval
+        func: "$e2_psf$ - $e2_star$"
+    res_size:
+      name: '(FWHM model - FWHM star) / (FWHM model)'
+      plot:
+        type: eval
+        func: "($size_psf$ - $size_star$)/$size_psf$"
+    x_res:
+      name: 'Centroid shifts\n$|x_{\mathrm{model}} - x_{\mathrm{star}}|$'
+      plot:
+        type: eval
+        func: "da.abs($cen_x_psf$ - $cen_x_star$)"
+    y_res:
+      name: 'Centroid shifts\n$|y_{\mathrm{model}} - y_{\mathrm{star}}|$'
+      plot:
+        type: eval
+        func: "da.abs($cen_x_psf$ - $cen_y_star$)"
+    dist_res:
+      name: 'Distance shifts\n$\sqrt{(x_{\mathrm{model}} - x_{\mathrm{star}})^{2} + (y_{\mathrm{model}} - y_{\mathrm{star}})^{2}}$'
+      plot:
+        type: eval
+        func: "da.sqrt(($cen_x_psf$ - $cen_x_star$)**2 + ($cen_y_psf$ - $cen_y_star$)**2)"
+    n_star:
+      name: '$n_{\mathrm{star}}$'
+      plot: 'e1_star'
+      eval_func:
+        type: eval
+        func: 'lambda x: np.shape(x)[0]'
