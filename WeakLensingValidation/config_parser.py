@@ -11,6 +11,12 @@ import re
 import os
 
 _main_fields = ['galaxy_catalog', 'star_catalog', 'mask_image']
+
+_cosmology_fields = [
+    'parameters',
+    'n_of_z',
+]
+
 _catalog_fields = ['type', 'path', 'columns']
 _classic_gal_columns = [
     'ra',
@@ -45,6 +51,11 @@ _psf_residuals_columns = [
     'plot',
 ]
 
+_rho_stats_fields = [
+    'requirements',
+    'plot_cov',
+]
+
 
 class ConfigParser():
     """ConfigParser
@@ -70,6 +81,8 @@ class ConfigParser():
             raise ValueError(f"No file found at: {config_path}")
 
         config_raw = self._read_yaml_file(config_path)
+        # DEBUG
+        self.config_raw = config_raw
 
         self.parse_config(config_raw)
 
@@ -101,6 +114,10 @@ class ConfigParser():
         # First get the variables
         self._parse_variables(config_raw)
 
+        # Cosmology
+        if 'cosmology' in config_raw.keys():
+            self._parse_cosmology(config_raw)
+
         # Galaxy catalogue
         if 'galaxy_catalog' in config_raw.keys():
             self._parse_galaxy_catalog(config_raw)
@@ -108,8 +125,13 @@ class ConfigParser():
         if 'star_catalog' in config_raw.keys():
             self._parse_star_catalog(config_raw)
 
+        # PSF residuals
         if 'psf_residuals' in config_raw.keys():
             self._parse_psf_residuals(config_raw)
+
+        # Rho-stats
+        if 'rho_stats' in config_raw.keys():
+            self._parse_rho_stat(config_raw)
 
     def _parse_workspace(self, config_raw):
         """parse workspace
@@ -176,6 +198,19 @@ class ConfigParser():
 
         config = {'workspace': config}
         self.config.update(config)
+
+    def _parse_cosmology(self, config_raw):
+        """parse cosmology
+
+        Read and store the cosmological information used to initialyse the
+        cosmology class
+
+        Parameters
+        ----------
+        config_raw : dict
+            raw output of the yaml loader
+        """
+        pass
 
     def _parse_galaxy_catalog(self, config_raw):
         """parse the galaxy catalog
@@ -466,6 +501,15 @@ class ConfigParser():
 
         config = {'psf_residuals': config}
         self.config.update(config)
+
+    def _parse_rho_stat(self, config_raw):
+
+        config = {}
+        rho_stats_dict = config_raw['rho_stats']
+
+    def _parse_correlation(self, config_corr):
+
+        pass
 
     def _read_yaml_file(self, path):
         """read yaml file

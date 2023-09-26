@@ -5,6 +5,7 @@ from config_parser import ConfigParser
 
 # This is used with the eval function
 import dask.array as da
+import dask.dataframe as df
 import vaex
 from vaex.convert import convert
 
@@ -203,6 +204,7 @@ class StarCatalog(Catalog):
         self.column_names = list(cat_config['columns'].keys())
         self._columns = {}
         for column_name in self.column_names:
+            print(column_name)
             self._columns[column_name] = self._get_column(
                 cat_config['columns'][column_name],
                 self.column_names,

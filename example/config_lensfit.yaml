@@ -17,7 +17,7 @@ var-1:
 # Workspace setup #
 ###################
 # Name of the run
-run_name: lensfit
+run_name: lensfit_small_cat
 
 # The directory used for the run and store the results
 workspace_directory: /Users/aguinot/Documents/weaklensingvalidation_test/workspace
@@ -28,16 +28,41 @@ workspace_directory: /Users/aguinot/Documents/weaklensingvalidation_test/workspa
 # plot_only: True
 
 
+#############
+# Cosmology #
+#############
+cosmology:
+  parameters:
+    # Any parameters used in pyccl.Cosmology can be set.
+    # If a parameters is not provided, the default value is used (see pyccl
+    # documentation for me details)
+    # Planck cosmo 2018 | TT,TE,EE+lowE+lensing+BAO
+    # Omega_c:
+    Omega_m: 0.3111
+    Omega_b: 0.0490
+    h: 0.6766
+    sigma8: 0.8102
+    # A_s:
+    n_s: 0.9665
+    w0: -1.0
+    w1: 0.
+    transfer_function: 'boltzmann_camb'
+    matter_power_spectrum: 'halofit'
+  n_of_z:
+    # An ASCII file is expected with 2 columns, the redshift and the n(z)
+    path: /Users/aguinot/Documents/weaklensingvalidation_test/test_cat/nz_A.txt
+
+
 ############
 # Catalogs #
 ############
 galaxy_catalog:
   # If more than one catalog is provided they all need to have the same format
-  path: '/Users/aguinot/Documents/weaklensingvalidation_test/test_cat/small_lensfit_cat_1.fits.hdf5'
+  # path: '/Users/aguinot/Documents/weaklensingvalidation_test/test_cat/small_lensfit_cat_1.fits.hdf5'
   # path: ['galaxy_catalog_1.fits', 'galaxy_catalo_2.fits']
-  # path:
-  #   type: eval
-  #   func: "[f'/Users/aguinot/Documents/weaklensingvalidation_test/test_cat/small_lensfit_cat_{i}.fits.hdf5' for i in $patch$]"
+  path:
+    type: eval
+    func: "[f'/Users/aguinot/Documents/weaklensingvalidation_test/test_cat/small_lensfit_cat_{i}.fits.hdf5' for i in $patch$]"
   # If keep_cat_history == True we keep track of the objects and from which
   # catalog they come from. A variable is define internaly var_cat_history
   # that can be used to make plot per catalog (see ploting below).
@@ -73,10 +98,10 @@ galaxy_catalog:
     mag: MAG_AUTO
 
 star_catalog:
-  path: '/Users/aguinot/Documents/weaklensingvalidation_test/test_cat/P1psf_model.fits'
-  # path:
-  #   type: eval
-  #   func: "[f'/Users/aguinot/Documents/weaklensingvalidation_test/test_cat/P{i}psf_model_small.fits' for i in $patch$]"
+  # path: '/Users/aguinot/Documents/weaklensingvalidation_test/test_cat/P1psf_model.fits'
+  path:
+    type: eval
+    func: "[f'/Users/aguinot/Documents/weaklensingvalidation_test/test_cat/P{i}psf_model_small.fits' for i in $patch$]"
   # This part is ignored for the star catalog if a galaxy catalog is provided.
   # Everything set here will be updated based on the galaxy catalog.
   # keep_cat_history: True
@@ -191,3 +216,15 @@ psf_residuals:
       eval_func:
         type: eval
         func: 'lambda x: np.shape(x)[0]'
+
+rho_stats:
+  correlation_config:
+    nbins: 32
+    sep_units: arcmin
+    min_sep: 0.1
+    max_sep: 300
+    npatch: 0
+    cov_type: jackknife
+    low_mem: False
+  requirements: True
+  plot_cov: True
