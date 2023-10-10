@@ -318,11 +318,11 @@ class PSFResiduals():
                     continue
 
                 if ccd_nb < 0:
-                    def flip_func(x): return x
+                    def flip_func(x): return np.flipud(x)
                     ccd_nb = abs(ccd_nb)
                 else:
                     # The code return the CCDs upside down by default
-                    flip_func = np.flipud
+                    flip_func = np.fliplr
                 ccd_ind = self._ccd_ids_2_ind[ccd_nb]
                 ax = axes[row, col]
                 im = ax.imshow(
