@@ -156,7 +156,7 @@ class Correlations():
         This is the main function users are going to call to compute the
         Shear-Shear correlations. The entries are provided as dask.Arrays.
         Once the Correlation class is intenciated, this method can be called
-        multiple times. For example, if one wants to compute all the rho
+        multiple times. For config_samples, if one wants to compute all the rho
         statistics using patches, it will call this function the first time
         with ``reuse_center=False`` and can switch to ``True`` on the folowing
         calls to avoid re-computing the patch centers. The results are saved

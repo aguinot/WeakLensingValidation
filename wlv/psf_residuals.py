@@ -3,15 +3,14 @@
 # PSF residuals
 # This code compute all sorts of residuals on the focal plane
 
-import dask.array as da
-# from dask.distributed import Client, LocalCluster
+from pathlib import Path
 
+import dask.array as da
 import numpy as np
 import matplotlib.pyplot as plt
 
-from catalog import StarCatalog
-from config_parser import ConfigParser
-
+from wlv.star_catalog import StarCatalog
+from wlv.config_parser import ConfigParser
 import copy
 from tqdm import tqdm
 import os
@@ -43,9 +42,9 @@ def cantor_pairing_func(x, y):
 
 
 def inv_cantor_pairing_func(z):
-    """inverse cantop pairing function
+    """Inverse cantor pairing function
 
-    This does the inverse operation of the Cantor pairing fucntion.
+    This does the inverse operation of the Cantor pairing function.
     See Wikipedia for more details:
     https://en.wikipedia.org/wiki/Pairing_function
 
@@ -70,20 +69,20 @@ def inv_cantor_pairing_func(z):
 
 
 class PSFResiduals():
-    """PSFResiduals
+    """PSFResiduals handles focal plane plotting and data analysis.
 
-    This class handle the plotting on the focal plane. It will bin the CCDs
-    and compute, usually the mean, of a quantity in each of those bins. The
-    user can also provide a custom evaluation function for more complex plots.
-    The code can also performs basic operations between columns to compute
-    residuals for example.
+    This class facilitates plotting on the focal plane by binning the CCDs and
+    computing statistical quantities, typically the mean, within each bin. Users
+    can provide custom evaluation functions for more complex visualizations. The
+    code also supports basic operations between columns, enabling residual
+    computations, among other possibilities.
 
     Parameters
     ----------
     star_cat : StarCatalog
         Instance of a StarCatalog to use to make the plots
     config : ConfigParser
-        Instance of the ConfigParser with all the informaton about the plots
+        Instance of the ConfigParser with all the information about the plots
     """
 
     def __init__(
@@ -94,10 +93,10 @@ class PSFResiduals():
     ):
 
         if not isinstance(star_cat, StarCatalog):
-            raise ValueError(f"star_cat must be an instance of {StarCatalog}")
+            raise ValueError(f"'star_cat' must be an instance of {StarCatalog}")
         self._starcat = star_cat
         if not isinstance(config, ConfigParser):
-            raise ValueError(f"config must be an instance of {ConfigParser}")
+            raise ValueError(f"'config' must be an instance of {ConfigParser}")
 
         self.nbin_x = config.config['psf_residuals']['nbin_x']
         self.nbin_y = config.config['psf_residuals']['nbin_y']
@@ -112,28 +111,16 @@ class PSFResiduals():
         self._set_workspace(config.config["workspace"])
 
     def process(self):
-        """process
-
-        Main method wich will first compute all the CCD bins and then make the
-        plots.
-        """
-
+        """Compute the CCD bins and plot the results"""
         # Compute all data to plot
         self._get_all_val_np()
-
         for plot_name in self._plots.keys():
-            # Save the data for the plot
             self._save_results(plot_name)
-
-            # Make the plot
             self._make_plot(plot_name)
 
     def _initialize(self):
-        """initialization
-
-        Here we set some parameters which are needed for the computation.
-
-        NOTE: We neet to add here the handling of already existing runs.
+        """Required initialization for future computations
+        Note: We neet to add here the handling of already existing runs. Todo: pas clair
         """
 
         self._nb_pixel = (self.nbin_x, self.nbin_y)
@@ -148,14 +135,12 @@ class PSFResiduals():
         }
 
     def _set_workspace(self, config_ws):
-        """set_workspace
-
-        Here we setup the workspace and output directory.
+        """Set up the workspace
 
         Parameters
         ----------
         config_ws : dict
-            Dictionnary with the workspace configuration
+            workspace configuration
         """
 
         self._output_dir = os.path.join(config_ws['path'], 'psf_residuals')
@@ -206,12 +191,10 @@ class PSFResiduals():
                 ).compute())
 
     def _get_all_val_np(self):
-        """get_all_val_np
+        """Get all the values for the different bins.
 
-        Get all the values for the different bins.
-
-        NOTE: This is the numpy version which is faster than dask and do not
-        use lot of memory.. At some point it could be nice to have a dask
+        Note: This is the numpy version which is faster than dask and do not
+        use a lot of memory. At some point it could be nice to have a dask
         version of this function.
         """
 
@@ -221,7 +204,7 @@ class PSFResiduals():
         y = self._starcat['y'].compute()
 
         # From (x, y) we create a unique index
-        # Get all unique indices on wich we iterate
+        # Get all unique indices on which we iterate
         x_tmp = da.arange(1, self._nb_pixel[0]+1).compute()
         y_tmp = da.arange(1, self._nb_pixel[1]+1).compute()
         xx_tmp, yy_tmp = da.meshgrid(x_tmp, y_tmp)
@@ -237,9 +220,9 @@ class PSFResiduals():
             for plot_name in self._plots.keys()
         }
 
-        # Now we loop over all CCDs.
-        # Then we loop over each plots.
-        # Finally we iterate over each bins.
+        # Loop over all CCDs.
+        #   Loop over each plot.
+        # Finally, we iterate over each bin.
         # Thanks to the unique indices we can avoid nested for loops and use
         # comprehension lists which are faster.
         self._ccd_maps = {plot_name: [] for plot_name in self._plots.keys()}
@@ -261,9 +244,7 @@ class PSFResiduals():
                 )
 
     def _save_results(self, plot_name):
-        """save results
-
-        Save the focal plane data for each plots as a numpy file.
+        """Save the focal plane data for each plot in numpy files.
 
         Parameters
         ----------
@@ -271,18 +252,12 @@ class PSFResiduals():
             Name of the plot to make among the one requested in the config
             file
         """
-
-        output_name = os.path.join(self._output_dir, plot_name)
-        output_name += '.npy'
-
         ccd_map = self._ccd_maps[plot_name]
-
+        output_name = Path(self._output_dir) / (plot_name + ".npy")
         np.save(output_name, ccd_map)
 
     def _make_plot(self, plot_name):
-        """make_plot
-
-        Make one focal plot.
+        """Make one focal plot
 
         Parameters
         ----------
@@ -298,15 +273,11 @@ class PSFResiduals():
             figsize=(25, 12),
             dpi=400
         )
-
-        output_name = os.path.join(self._output_dir, plot_name)
-        output_name += '.png'
-
         vmax = np.nanmax(self._ccd_maps[plot_name])
         vmin = np.nanmin(self._ccd_maps[plot_name])
 
-        # Remove un-used CCDs
-        mask_ccd = np.where(self._focal_plane_display == 999)
+        # Remove unused CCDs
+        mask_ccd = np.nonzero(self._focal_plane_display == 999)
         for ax in axes[mask_ccd]:
             ax.axis('off')
 
@@ -339,13 +310,13 @@ class PSFResiduals():
         plt.subplots_adjust(right=0.6)
         cbar_ax = fig.add_axes([0.65, 0.15, 0.025, 0.7])
         fig.colorbar(im, cax=cbar_ax)
-        plt.savefig(output_name, bbox_inches='tight')
+
+        output_name = Path(self._output_dir) / (plot_name + ".png")
+        plt.savefig(output_name, bbox_inches="tight")
         plt.close()
 
     def _get_plot_val(self, plot_name):
-        """get_plot_val
-
-        Get the value to plot, either a column or an operation between
+        """Get the value to plot, either a column or an operation between
         columns.
 
         Parameters
@@ -356,8 +327,8 @@ class PSFResiduals():
 
         Returns
         -------
-        res : da.array
-            Dask array with the value to plot
+        da.array
+            Values to plot
         """
 
         plot = self._plots[plot_name]['plot']
