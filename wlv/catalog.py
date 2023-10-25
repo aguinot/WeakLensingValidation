@@ -147,12 +147,12 @@ class Catalog(ABC):
         """
 
         if isinstance(col_name, str):
-            return self._df[col_name]
+            return self._df[col_name].to_dask_array()
         elif isinstance(col_name, dict):
             cat_tmp = {}
             expression = copy.copy(col_name["func"])
             for var_name in col_name["var"]:
-                cat_tmp[var_name] = self._df[var_name]
+                cat_tmp[var_name] = self._df[var_name].to_dask_array()
                 expression = expression.replace(
                     f"${var_name}$", f"cat_tmp['{var_name}']"
                 )
